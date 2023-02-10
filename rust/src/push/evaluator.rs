@@ -12,6 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+use std::borrow::Cow;
 use std::collections::{BTreeMap, BTreeSet};
 
 use crate::push::JsonValue;
@@ -266,7 +267,7 @@ impl PushRuleEvaluator {
                 self.match_related_event_match(event_match, user_id)?
             }
             KnownCondition::ExactEventPropertyContains(exact_event_match) => {
-                self.match_exact_event_property_contains(exact_event_match)?
+                self.match_exact_event_property_contains(exact_event_match, user_id)?
             }
             KnownCondition::IsUserMention => {
                 if let Some(uid) = user_id {
@@ -379,7 +380,12 @@ impl PushRuleEvaluator {
             return Ok(false);
         }
 
-        let value = &exact_event_match.value;
+        // exact_event_match requires a value to be set.
+        let value = if let Some(value) = &exact_event_match.value {
+            value
+        } else {
+            return Ok(false);
+        };
 
         let haystack = if let Some(JsonValue::Value(haystack)) =
             self.flattened_keys.get(&*exact_event_match.key)
@@ -470,13 +476,31 @@ impl PushRuleEvaluator {
     fn match_exact_event_property_contains(
         &self,
         exact_event_match: &ExactEventMatchCondition,
+        user_id: Option<&str>,
     ) -> Result<bool, Error> {
         // First check if the feature is enabled.
         if !self.msc3966_exact_event_property_contains {
             return Ok(false);
         }
 
-        let value = &exact_event_match.value;
+        let value: Cow<SimpleJsonValue> = if let Some(value) = &exact_event_match.value {
+            Cow::Borrowed(value)
+        } else if let Some(value_type) = &exact_event_match.value_type {
+            // The `value_type` must be "user_id", if we don't have a `user_id`
+            // then the condition can't match.
+            let user_id = if let Some(user_id) = user_id {
+                user_id
+            } else {
+                return Ok(false);
+            };
+
+            match &**value_type {
+                "user_id" => Cow::Owned(SimpleJsonValue::Str(user_id.to_string())),
+                _ => return Ok(false),
+            }
+        } else {
+            return Ok(false);
+        };
 
         let haystack = if let Some(JsonValue::Array(haystack)) =
             self.flattened_keys.get(&*exact_event_match.key)
@@ -486,7 +510,7 @@ impl PushRuleEvaluator {
             return Ok(false);
         };
 
-        Ok(haystack.contains(&**value))
+        Ok(haystack.contains(&value))
     }
 
     /// Match the member count against an 'is' condition

@@ -376,7 +376,10 @@ pub struct EventMatchCondition {
 #[derive(Serialize, Deserialize, Debug, Clone)]
 pub struct ExactEventMatchCondition {
     pub key: Cow<'static, str>,
-    pub value: Cow<'static, SimpleJsonValue>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub value: Option<Cow<'static, SimpleJsonValue>>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub value_type: Option<Cow<'static, str>>,
 }
 
 /// The body of a [`Condition::RelatedEventMatch`]

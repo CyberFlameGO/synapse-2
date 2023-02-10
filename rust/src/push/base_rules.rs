@@ -151,7 +151,13 @@ pub const BASE_APPEND_OVERRIDE_RULES: &[PushRule] = &[
     PushRule {
         rule_id: Cow::Borrowed(".org.matrix.msc3952.is_user_mention"),
         priority_class: 5,
-        conditions: Cow::Borrowed(&[Condition::Known(KnownCondition::IsUserMention)]),
+        conditions: Cow::Borrowed(&[Condition::Known(
+            KnownCondition::ExactEventPropertyContains(ExactEventMatchCondition {
+                key: Cow::Borrowed("content.org.matrix.msc3952.mentions.user_ids"),
+                value: None,
+                value_type: Some(Cow::Borrowed("user_id")),
+            }),
+        )]),
         actions: Cow::Borrowed(&[Action::Notify, HIGHLIGHT_ACTION, SOUND_ACTION]),
         default: true,
         default_enabled: true,
@@ -170,7 +176,8 @@ pub const BASE_APPEND_OVERRIDE_RULES: &[PushRule] = &[
         conditions: Cow::Borrowed(&[
             Condition::Known(KnownCondition::ExactEventMatch(ExactEventMatchCondition {
                 key: Cow::Borrowed("content.org.matrix.msc3952.mentions.room"),
-                value: Cow::Borrowed(&SimpleJsonValue::Bool(true)),
+                value: Some(Cow::Borrowed(&SimpleJsonValue::Bool(true))),
+                value_type: None,
             })),
             Condition::Known(KnownCondition::SenderNotificationPermission {
                 key: Cow::Borrowed("room"),
