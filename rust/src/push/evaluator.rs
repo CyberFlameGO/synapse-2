@@ -13,7 +13,7 @@
 // limitations under the License.
 
 use std::borrow::Cow;
-use std::collections::{BTreeMap, BTreeSet};
+use std::collections::BTreeMap;
 
 use crate::push::JsonValue;
 use anyhow::{Context, Error};
@@ -70,11 +70,6 @@ pub struct PushRuleEvaluator {
     /// The "content.body", if any.
     body: String,
 
-    /// True if the event has a mentions property and MSC3952 support is enabled.
-    has_mentions: bool,
-    /// The user mentions that were part of the message.
-    user_mentions: BTreeSet<String>,
-
     /// The number of users in the room.
     room_member_count: u64,
 
@@ -104,6 +99,9 @@ pub struct PushRuleEvaluator {
 
     /// If MSC3966 (exact_event_property_contains push rule condition) is enabled.
     msc3966_exact_event_property_contains: bool,
+
+    /// True if the event has a mentions property and MSC3952 support is enabled.
+    msc3952_intentional_mentions_enabled: bool,
 }
 
 #[pymethods]
@@ -113,8 +111,6 @@ impl PushRuleEvaluator {
     #[new]
     pub fn py_new(
         flattened_keys: BTreeMap<String, JsonValue>,
-        has_mentions: bool,
-        user_mentions: BTreeSet<String>,
         room_member_count: u64,
         sender_power_level: Option<i64>,
         notification_power_levels: BTreeMap<String, i64>,
@@ -124,6 +120,7 @@ impl PushRuleEvaluator {
         msc3931_enabled: bool,
         msc3758_exact_event_match: bool,
         msc3966_exact_event_property_contains: bool,
+        msc3952_intentional_mentions_enabled: bool,
     ) -> Result<Self, Error> {
         let body = match flattened_keys.get("content.body") {
             Some(JsonValue::Value(SimpleJsonValue::Str(s))) => s.clone(),
@@ -133,8 +130,6 @@ impl PushRuleEvaluator {
         Ok(PushRuleEvaluator {
             flattened_keys,
             body,
-            has_mentions,
-            user_mentions,
             room_member_count,
             notification_power_levels,
             sender_power_level,
@@ -144,6 +139,7 @@ impl PushRuleEvaluator {
             msc3931_enabled,
             msc3758_exact_event_match,
             msc3966_exact_event_property_contains,
+            msc3952_intentional_mentions_enabled,
         })
     }
 
@@ -170,9 +166,11 @@ impl PushRuleEvaluator {
 
             // For backwards-compatibility the legacy mention rules are disabled
             // if the event contains the 'm.mentions' property (and if the
-            // experimental feature is enabled, both of these are represented
-            // by the has_mentions flag).
-            if self.has_mentions
+            // experimental feature is enabled).
+            if self.msc3952_intentional_mentions_enabled
+                && self
+                    .flattened_keys
+                    .contains_key("contents.org.matrix.msc3952.mentions")
                 && (rule_id == "global/override/.m.rule.contains_display_name"
                     || rule_id == "global/content/.m.rule.contains_user_name"
                     || rule_id == "global/override/.m.rule.roomnotif")
@@ -268,13 +266,6 @@ impl PushRuleEvaluator {
             }
             KnownCondition::ExactEventPropertyContains(exact_event_match) => {
                 self.match_exact_event_property_contains(exact_event_match, user_id)?
-            }
-            KnownCondition::IsUserMention => {
-                if let Some(uid) = user_id {
-                    self.user_mentions.contains(uid)
-                } else {
-                    false
-                }
             }
             KnownCondition::ContainsDisplayName => {
                 if let Some(dn) = display_name {
@@ -546,14 +537,13 @@ fn push_rule_evaluator() {
     );
     let evaluator = PushRuleEvaluator::py_new(
         flattened_keys,
-        false,
-        BTreeSet::new(),
         10,
         Some(0),
         BTreeMap::new(),
         BTreeMap::new(),
         true,
         vec![],
+        true,
         true,
         true,
         true,
@@ -578,14 +568,13 @@ fn test_requires_room_version_supports_condition() {
     let flags = vec![RoomVersionFeatures::ExtensibleEvents.as_str().to_string()];
     let evaluator = PushRuleEvaluator::py_new(
         flattened_keys,
-        false,
-        BTreeSet::new(),
         10,
         Some(0),
         BTreeMap::new(),
         BTreeMap::new(),
         false,
         flags,
+        true,
         true,
         true,
         true,

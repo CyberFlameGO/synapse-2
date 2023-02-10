@@ -167,8 +167,6 @@ class PushRuleEvaluatorTestCase(unittest.TestCase):
         power_levels: Dict[str, Union[int, Dict[str, int]]] = {}
         return PushRuleEvaluator(
             _flatten_dict(event),
-            has_mentions,
-            user_mentions or set(),
             room_member_count,
             sender_power_level,
             cast(Dict[str, int], power_levels.get("notifications", {})),
@@ -178,6 +176,7 @@ class PushRuleEvaluatorTestCase(unittest.TestCase):
             msc3931_enabled=True,
             msc3758_exact_event_match=True,
             msc3966_exact_event_property_contains=True,
+            msc3952_intention_mentions=True,
         )
 
     def test_display_name(self) -> None:
@@ -203,32 +202,6 @@ class PushRuleEvaluatorTestCase(unittest.TestCase):
 
         # A display name with spaces should work fine.
         self.assertTrue(evaluator.matches(condition, "@user:test", "foo bar"))
-
-    def test_user_mentions(self) -> None:
-        """Check for user mentions."""
-        condition = {"kind": "org.matrix.msc3952.is_user_mention"}
-
-        # No mentions shouldn't match.
-        evaluator = self._get_evaluator({}, has_mentions=True)
-        self.assertFalse(evaluator.matches(condition, "@user:test", None))
-
-        # An empty set shouldn't match
-        evaluator = self._get_evaluator({}, has_mentions=True, user_mentions=set())
-        self.assertFalse(evaluator.matches(condition, "@user:test", None))
-
-        # The Matrix ID appearing anywhere in the mentions list should match
-        evaluator = self._get_evaluator(
-            {}, has_mentions=True, user_mentions={"@user:test"}
-        )
-        self.assertTrue(evaluator.matches(condition, "@user:test", None))
-
-        evaluator = self._get_evaluator(
-            {}, has_mentions=True, user_mentions={"@another:test", "@user:test"}
-        )
-        self.assertTrue(evaluator.matches(condition, "@user:test", None))
-
-        # Note that invalid data is tested at tests.push.test_bulk_push_rule_evaluator.TestBulkPushRuleEvaluator.test_mentions
-        # since the BulkPushRuleEvaluator is what handles data sanitisation.
 
     def _assert_matches(
         self, condition: JsonDict, content: JsonMapping, msg: Optional[str] = None

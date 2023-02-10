@@ -23,20 +23,13 @@ from typing import (
     Mapping,
     Optional,
     Sequence,
-    Set,
     Tuple,
     Union,
 )
 
 from prometheus_client import Counter
 
-from synapse.api.constants import (
-    MAIN_TIMELINE,
-    EventContentFields,
-    EventTypes,
-    Membership,
-    RelationTypes,
-)
+from synapse.api.constants import MAIN_TIMELINE, EventTypes, Membership, RelationTypes
 from synapse.api.room_versions import PushRuleRoomFlag
 from synapse.event_auth import auth_types_for_event, get_user_power_level
 from synapse.events import EventBase, relation_from_event
@@ -396,27 +389,11 @@ class BulkPushRuleEvaluator:
                     except (TypeError, ValueError):
                         del notification_levels[key]
 
-        # Pull out any user and room mentions.
-        mentions = event.content.get(EventContentFields.MSC3952_MENTIONS)
-        has_mentions = self._intentional_mentions_enabled and isinstance(mentions, dict)
-        user_mentions: Set[str] = set()
-        if has_mentions:
-            # mypy seems to have lost the type even though it must be a dict here.
-            assert isinstance(mentions, dict)
-            # Remove out any non-string items and convert to a set.
-            user_mentions_raw = mentions.get("user_ids")
-            if isinstance(user_mentions_raw, list):
-                user_mentions = set(
-                    filter(lambda item: isinstance(item, str), user_mentions_raw)
-                )
-
         evaluator = PushRuleEvaluator(
             _flatten_dict(
                 event,
                 msc3783_escape_event_match_key=self.hs.config.experimental.msc3783_escape_event_match_key,
             ),
-            has_mentions,
-            user_mentions,
             room_member_count,
             sender_power_level,
             notification_levels,
@@ -426,6 +403,7 @@ class BulkPushRuleEvaluator:
             self.hs.config.experimental.msc1767_enabled,  # MSC3931 flag
             self.hs.config.experimental.msc3758_exact_event_match,
             self.hs.config.experimental.msc3966_exact_event_property_contains,
+            self.hs.config.experimental.msc3952_intentional_mentions,
         )
 
         users = rules_by_user.keys()
