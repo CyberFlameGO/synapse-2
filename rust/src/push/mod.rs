@@ -375,11 +375,17 @@ pub struct EventMatchCondition {
     pub pattern: Cow<'static, str>,
 }
 
+#[derive(Debug, Clone)]
+pub enum EventMatchPatternType {
+    UserId,
+    UserLocalpart,
+}
+
 /// The body of a [`Condition::EventMatch`] that uses user_id or user_localpart as a pattern.
 #[derive(Debug, Clone)]
 pub struct EventMatchTypeCondition {
     pub key: Cow<'static, str>,
-    pub pattern_type: Cow<'static, str>,
+    pub pattern_type: Cow<'static, EventMatchPatternType>,
 }
 
 /// The body of a [`Condition::ExactEventMatch`]
@@ -405,7 +411,7 @@ pub struct RelatedEventMatchCondition {
 #[derive(Debug, Clone)]
 pub struct RelatedEventMatchTypeCondition {
     pub key: Cow<'static, str>,
-    pub pattern_type: Cow<'static, str>,
+    pub pattern_type: Cow<'static, EventMatchPatternType>,
     pub rel_type: Cow<'static, str>,
     pub include_fallbacks: Option<bool>,
 }
