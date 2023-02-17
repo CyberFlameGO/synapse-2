@@ -138,6 +138,11 @@ class BackgroundUpdateStartJobRestServlet(RestServlet):
                     "populate_user_directory_process_rooms",
                 ),
                 (
+                    "populate_user_directory_process_remote_users",
+                    "{}",
+                    "populate_user_directory_process_users",
+                ),
+                (
                     "populate_user_directory_cleanup",
                     "{}",
                     "populate_user_directory_process_users",
